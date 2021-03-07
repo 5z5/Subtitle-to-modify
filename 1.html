@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>字幕修改</title>
+    <script src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.12.4.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            //合并
+            var arrGroup = [];
+            var rec;
+            let moveSelected = $('#moveSelected')[0];
+            let flag=false;//是搜开启拖拽的标志
+            let oldLeft=0;//鼠标按下时的left,top
+            let oldTop=0;
+            let selectedList=[];//拖拽多选选中的块集合
+            $(".list").mousedown(function(event) {
+                for (var i=0;i<selectedList.length;i++){
+                    selectedList[i].style.backgroundColor = "greenyellow";
+                }
+                selectedList.splice(0,selectedList.length);
+                flag=true;
+                moveSelected.style.top=event.pageY+'px';
+                moveSelected.style.left=event.pageX+'px';
+                oldLeft=event.pageX;
+                oldTop=event.pageY;
+                event.preventDefault();  // 阻止默认行为
+                event.stopPropagation(); // 阻止事件冒泡
+            });
+            $('#btnMerge').click(function () {
+                var rec = Number(selectedList[1].attributes["index"].nodeValue);
+                var recAfterTime = [];
+                var lastIndex = Number(selectedList[selectedList.length-1].attributes["index"].nodeValue);
+                var firstIndex = Number(selectedList[0].attributes["index"].nodeValue);
+                recAfterTime += arrGroup[firstIndex][1].substring(0,17);
+                recAfterTime += arrGroup[lastIndex][1].substring(17);
+                arrGroup[Number(selectedList[0].attributes["index"].nodeValue)][1] = recAfterTime;
+                for (var i=1;i<selectedList.length;i++){
+                    var tab = $('.list').get(0);
+                    tab.deleteRow(rec);
+                    var trs = $('.tr');
+                    for (var j=rec;j<trs.length;j++){
+                        trs[j].attributes["index"].nodeValue = String(Number(trs[j].attributes["index"].nodeValue)-1);
+                    }
+                    for (var j=rec;j<(arrGroup.length-1);j++){
+                        arrGroup[j][1] = arrGroup[j+1][1];
+                        arrGroup[j][2] = arrGroup[j+1][2];
+                    }
+                    arrGroup.pop();
+                }
+            });
+            $(".list").mousemove(function(event) {
+                if(!flag) return;//只有开启了拖拽，才进行mouseover操作
+                if(event.pageX<oldLeft){//向左拖
+                    moveSelected.style.left=event.pageX+'px';
+                    moveSelected.style.width=(oldLeft-event.pageX)+'px';
+                }else{
+                    moveSelected.style.width=(event.pageX-oldLeft)+'px';
+                }
+                if(event.pageY<oldTop){//向上
+                    moveSelected.style.top=event.pageY+'px';
+                    moveSelected.style.height=(oldTop-event.pageY)+'px';
+                }else{
+                    moveSelected.style.height=(event.pageY-oldTop)+'px';
+                }
+                event.preventDefault();  // 阻止默认行为
+                event.stopPropagation(); // 阻止事件冒泡
+            });
+            $(".list").mouseup(function(event) {
+                moveSelected.style.bottom=Number(moveSelected.style.top.split('px')[0])+Number(moveSelected.style.height.split('px')[0]) + 'px';
+                moveSelected.style.right=Number(moveSelected.style.left.split('px')[0])+Number(moveSelected.style.width.split('px')[0])+'px';
+                findSelected();
+                flag=false;
+                clearDragData();
+                event.preventDefault();  // 阻止默认行为
+                event.stopPropagation(); // 阻止事件冒泡
+            });
+            $(".list").mouseleave(function(event) {
+                flag=false;
+                moveSelected.style.width=0;
+                moveSelected.style.height=0;
+                moveSelected.style.top=0;
+                moveSelected.style.left=0;
+                event.preventDefault();  // 阻止默认行为
+                event.stopPropagation(); // 阻止事件冒泡
+            });
+            let blockList;
+            function findSelected(){
+                blockList=$('.list').find('tr');
+                for(let i=0;i<blockList.length;i++){
+                    let top=$(blockList[i]).offset().top;
+                    let bottom=$(blockList[i]).height()+top;
+                    let topFlag=moveSelected.style.top.split('px')[0]<top && top<=moveSelected.style.bottom.split('px')[0];
+                    let bottomFlag=moveSelected.style.top.split('px')[0]<bottom && bottom<=moveSelected.style.bottom.split('px')[0];
+                    if(topFlag || bottomFlag){
+                        selectedList.push(blockList[i]);
+                        blockList[i].style.backgroundColor = "aquamarine";
+                    }
+                }
+            }
+            function clearDragData(){
+                moveSelected.style.width=0;
+                moveSelected.style.height=0;
+                moveSelected.style.top=0;
+                moveSelected.style.left=0;
+                moveSelected.style.bottom=0;
+                moveSelected.style.right=0;
+            }
+
+            //加载文件
+            var txt;
+            $('#btnLoadFile').click(function () {
+                var trs = $('.tr');
+                var recLen = trs.length;
+                var tab = $('.list').get(0);
+                if (trs.length>0){
+                    for (var i=0;i<recLen;i++){
+                        tab.deleteRow(0);
+                    }
+                    arrGroup.splice(0,arrGroup.length);
+                }
+                var file = $("#file").get(0).files;
+                file = file[0];
+                var reader = new FileReader();
+                reader.onload = function () {
+                    var arr = this.result.split("\n");
+                    var rec = 0;
+                    for (var i = 1; i < arr.length; i += 2) {
+                        arrGroup[rec] = [];
+                        arrGroup[rec][0] = (rec+1)+"\n";
+                        arrGroup[rec][1] = arr[i++];
+                        arrGroup[rec][2] = arr[i++];
+                        rec++;
+                    }
+                    var div = $('.list').get(0);
+                    for (var i = 0; i < arrGroup.length; i++) {
+                        var tr = document.createElement("tr");
+                        tr.className = "tr";
+                        var recInd = String(i);
+                        tr.setAttribute("index",recInd);
+                        tr.innerHTML = arrGroup[i][2];
+                        div.append(tr);
+                    }
+                };
+                reader.readAsText(file, 'GB2312');
+            });
+
+            //点击字幕
+            $(".list").on('click','.tr',function () {
+                for (var i=0;i<selectedList.length;i++){
+                    selectedList[i].style.backgroundColor = "greenyellow";
+                }
+                selectedList.splice(0,selectedList.length);
+                txt = $("#txt").get(0);
+                txt.value = this.innerHTML;
+                rec = this;
+            });
+
+            //修改
+            $('#btnModify').click(function () {
+                rec.innerHTML = txt.value;
+                arrGroup[Number(rec.attributes["index"].nodeValue)][2] = txt.value+"\n";
+            });
+
+            //删除文件
+            $("#btnDelete").click(function () {
+                var trs = $(".tr");
+                for (var i=Number(Number(rec.attributes["index"].nodeValue)+1);i<trs.length;i++){
+                    trs[i].attributes["index"].nodeValue = String(Number(trs[i].attributes["index"].nodeValue)-1);
+                }
+                var tab = $(".list").get(0);
+                tab.deleteRow(Number(rec.attributes["index"].nodeValue));
+                for (var i=Number(rec.attributes["index"].nodeValue);i<arrGroup.length-1;i++){
+                    arrGroup[i][1] = arrGroup[i+1][1];
+                    arrGroup[i][2] = arrGroup[i+1][2];
+                }
+                arrGroup.pop();
+            });
+
+            //下载文件
+            $("#btnDownloadFile").click(function () {
+                var html = [];
+                for (var i=0;i<arrGroup.length;i++){
+                    for (var j=0;j<3;j++){
+                        html += arrGroup[i][j];
+                    }
+                    if (i==arrGroup.length-1){
+                        html += "\n";
+                    }
+                    else {
+                        html += "\n\n";
+                    }
+                }
+                var url = window.URL.createObjectURL(new Blob([html]));
+                var a = document.createElement('a');
+                a.setAttribute('href',url);
+                var name = "字幕";
+                a.setAttribute('download',name+".mov.srt");
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+        });
+    </script>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: floralwhite;
+        }
+        #page-content {
+            width: 100%;
+        }
+        #moveSelected{
+            position:absolute;
+            display: block;
+            background-color: blue;
+            opacity:0.3;
+            border:10px solid #d9d9d9;
+            top:0;
+            left:0;
+        }
+        .content-item {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 50px;
+            font-size: large;
+            font-family: Arial;
+        }
+        .content-item button {
+            width: 70px;
+            height: 30px;
+            border-radius: 5px;
+            background: aquamarine;
+        }
+        .list {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 400px;
+            overflow-y: auto;
+            margin: 10px auto;
+        }
+        .list tr {
+            display: block;
+            width: 100%;
+            height: 20px;
+            line-height: 20px;
+            margin: 2px 0;
+            border-radius: 5px;
+            background: greenyellow;
+            text-align: center;
+            cursor: default;
+        }
+        button:active {
+            background: darkgray;
+        }
+        #file {
+            border-radius: 5px;
+        }
+        #btnLoadFile {
+            margin: auto 30px;
+        }
+        #btnModify,#btnMerge,#btnDelete,#btnDownloadFile {
+            margin-left: 30px;
+        }
+        #txt {
+            border: 4px ridge lightgoldenrodyellow;
+        }
+    </style>
+</head>
+<body>
+<div id="page-content">
+    <div class="content-item">
+        <span>文件:&nbsp;</span>
+        <input type="file" id= "file"/>
+        <button id="btnLoadFile">加载文件</button>
+    </div>
+    <div class="content-item">
+        <span>弹幕:&nbsp;</span>
+        <input type="text" id="txt" size="80px"/>
+    </div>
+    <div class="content-item">
+        <button id="btnModify">修改</button>
+        <button id="btnMerge">合并</button>
+        <button id="btnDelete">删除</button>
+        <button id="btnDownloadFile">下载文件</button>
+    </div>
+    <div id="moveSelected" style="border:1px dashed #d9d9d9;"></div>
+    <table class="list">
+    </table>
+</div>
+</body>
+</html>
